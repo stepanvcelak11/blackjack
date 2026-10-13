@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>BJ Wiz CZ - Blackjack & Hi-Lo Trainer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background-color: #0b131e;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+    .playing-card {
+      width: 68px;
+      height: 98px;
+      background: linear-gradient(145deg, #ffffff, #f3f4f6);
+      border-radius: 8px;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.45);
+      display: inline-flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 6px;
+      font-weight: 800;
+      position: relative;
+      border: 1px solid #d1d5db;
+      transition: transform 0.2s ease;
+    }
+    .playing-card.red { color: #dc2626; }
+    .playing-card.black { color: #111827; }
+    .playing-card.back {
+      background: repeating-linear-gradient(45deg, #1e3a8a, #1e3a8a 8px, #172554 8px, #172554 16px);
+      border: 3px solid #f8fafc;
+    }
+    .table-felt {
+      background: radial-gradient(circle at top, #14532d 0%, #064e3b 75%, #022c22 100%);
+    }
+    /* Barvy přesně podle tvé tabulky */
+    .cell-S, .cell-Ds-stand { background-color: #eab308; color: #000; font-weight: 700; }
+    .cell-H { background-color: #ffffff; color: #111; font-weight: 600; }
+    .cell-D, .cell-Y, .cell-SUR { background-color: #10b981; color: #000; font-weight: 700; }
+    .cell-Ds, .cell-YN { background-color: #38bdf8; color: #000; font-weight: 700; }
+    .cell-N { background-color: #f3f4f6; color: #6b7280; }
+  </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden max-w-md mx-auto border-x border-slate-800 shadow-2xl">
+
+  <!-- HORNÍ LIŠTA -->
+  <header class="bg-slate-900 px-4 py-3 flex justify-between items-center border-b border-slate-800 shrink-0">
+    <div class="flex items-center space-x-2">
+      <span class="text-xl">♠️</span>
+      <h1 class="font-bold text-base tracking-wide text-emerald-400">BJ Wiz CZ</h1>
+    </div>
+    <div class="flex items-center space-x-2 text-xs">
+      <label class="flex items-center space-x-1 bg-slate-800 px-2 py-1 rounded cursor-pointer">
+        <input type="checkbox" id="toggle-das" checked onchange="updateSettings()" class="accent-emerald-500">
+        <span>DAS</span>
+      </label>
+      <label class="flex items-center space-x-1 bg-slate-800 px-2 py-1 rounded cursor-pointer">
+        <input type="checkbox" id="toggle-sur" checked onchange="updateSettings()" class="accent-emerald-500">
+        <span>SUR</span>
+      </label>
+      <div class="bg-emerald-950 text-emerald-300 border border-emerald-700 px-2.5 py-1 rounded font-mono font-bold">
+        <span id="header-accuracy">100%</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- HLAVNÍ OBSAH -->
+  <main class="flex-1 overflow-y-auto relative">
+
+    <!-- ================= 1. DRIL STRATEGIE (FLASHCARDS) ================= -->
+    <section id="view-drill" class="p-4 h-full flex flex-col justify-between">
+      <div>
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">Trénink rozhodování</h2>
+          <select id="drill-filter" onchange="nextDrillHand()" class="bg-slate-800 text-xs text-slate-200 px-2.5 py-1.5 rounded border border-slate-700">
+            <option value="ALL">Všechny situace</option>
+            <option value="HARD">Pouze Hard Totals (Tvrdé)</option>
+            <option value="SOFT">Pouze Soft Totals (Měkké s A)</option>
+            <option value="PAIR">Pouze Pair Splitting (Páry)</option>
+          </select>
+        </div>
+
+        <!-- Stůl -->
+        <div class="table-felt rounded-2xl p-5 shadow-inner border border-emerald-800/80 flex flex-col items-center justify-between min-h-[270px]">
+          <div class="text-center">
+            <span class="text-[11px] uppercase tracking-widest text-emerald-200/70 block mb-1">Karta Dealera</span>
+            <div id="drill-dealer-card" class="flex justify-center"></div>
+          </div>
+
+          <div id="drill-feedback" class="text-center my-2 min-h-[44px] flex items-center justify-center px-3 py-1 rounded-lg font-bold text-sm"></div>
+
+          <div class="text-center">
+            <div id="drill-player-cards" class="flex justify-center space-x-2 mb-1"></div>
+            <span id="drill-player-label" class="text-xs uppercase tracking-widest text-emerald-200/90 font-semibold block mt-1">Tvoje ruka</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ovládací tlačítka -->
+      <div class="mt-4">
+        <div class="grid grid-cols-2 gap-2.5 mb-2.5">
+          <button onclick="submitDrillAction('H')" class="bg-slate-100 active:bg-slate-300 text-slate-900 font-extrabold py-3.5 rounded-xl shadow text-base">HIT (H)</button>
+          <button onclick="submitDrillAction('S')" class="bg-yellow-500 active:bg-yellow-600 text-slate-950 font-extrabold py-3.5 rounded-xl shadow text-base">STAND (S)</button>
+          <button onclick="submitDrillAction('D')" class="bg-emerald-500 active:bg-emerald-600 text-slate-950 font-extrabold py-3.5 rounded-xl shadow text-base">DOUBLE (D)</button>
+          <button onclick="submitDrillAction('P')" class="bg-sky-400 active:bg-sky-500 text-slate-950 font-extrabold py-3.5 rounded-xl shadow text-base">SPLIT (Y)</button>
+        </div>
+        <button onclick="submitDrillAction('SUR')" class="w-full bg-teal-700 active:bg-teal-800 text-white font-bold py-2.5 rounded-xl shadow text-xs uppercase tracking-wider">SURRENDER (SUR - Vzdát hru)</button>
+      </div>
+    </section>
+
+    <!-- ================= 2. TRÉNINK POČÍTÁNÍ (HI-LO) ================= -->
+    <section id="view-count" class="p-4 h-full hidden flex-col justify-between">
+      <div>
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Trénink počítání Hi-Lo</h2>
+        <!-- Tahák z 1. fotky -->
+        <div class="grid grid-cols-3 gap-2 bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-center text-xs mb-4">
+          <div class="bg-emerald-950/60 border border-emerald-800/60 p-1.5 rounded-lg">
+            <div class="font-bold text-emerald-400">LOW (+1)</div>
+            <div class="text-slate-300 font-mono">2, 3, 4, 5, 6</div>
+          </div>
+          <div class="bg-slate-800/60 border border-slate-700 p-1.5 rounded-lg">
+            <div class="font-bold text-slate-300">NEUTRAL (0)</div>
+            <div class="text-slate-400 font-mono">7, 8, 9</div>
+          </div>
+          <div class="bg-rose-950/60 border border-rose-800/60 p-1.5 rounded-lg">
+            <div class="font-bold text-rose-400">HIGH (-1)</div>
+            <div class="text-slate-300 font-mono">10, J, Q, K, A</div>
+          </div>
+        </div>
+
+        <!-- Plocha pro karty -->
+        <div class="table-felt rounded-2xl p-6 border border-emerald-800 flex flex-col items-center justify-center min-h-[210px] relative">
+          <div class="absolute top-3 right-3 text-xs text-emerald-200/70 font-mono">
+            Karta: <span id="count-progress">0/20</span>
+          </div>
+          <div id="count-card-slot" class="flex space-x-3 items-center justify-center min-h-[105px]">
+            <span class="text-emerald-200/60 text-sm">Nastav rychlost a klikni na Start</span>
+          </div>
+          <div id="count-Value-hint" class="mt-3 text-xs font-mono text-emerald-300 h-4"></div>
+        </div>
+
+        <!-- Zadání výsledku -->
+        <div id="count-answer-box" class="hidden mt-4 bg-slate-900 p-4 rounded-xl border border-slate-800 text-center">
+          <p class="text-sm font-bold mb-2">Jaký je finální Running Count?</p>
+          <div class="flex items-center justify-center space-x-3 mb-3">
+            <button onclick="adjustCountInput(-1)" class="bg-slate-800 w-10 h-10 rounded-lg font-bold text-lg">-</button>
+            <input type="number" id="count-user-input" value="0" class="bg-slate-950 border border-slate-700 w-20 h-10 text-center font-mono text-lg font-bold rounded-lg">
+            <button onclick="adjustCountInput(1)" class="bg-slate-800 w-10 h-10 rounded-lg font-bold text-lg">+</button>
+          </div>
+          <button onclick="verifyCountDrill()" class="bg-emerald-500 text-slate-950 font-bold px-6 py-2 rounded-lg w-full">Ověřit součet</button>
+        </div>
+        <div id="count-result-msg" class="mt-3 text-center font-bold text-sm"></div>
+      </div>
+
+      <!-- Nastavení a Start -->
+      <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+        <div class="flex justify-between items-center text-xs mb-3">
+          <span>Rychlost (vteřiny na kartu): <b id="speed-label" class="text-emerald-400">1.2s</b></span>
+          <input type="range" id="count-speed" min="0.4" max="3.0" step="0.2" value="1.2" oninput="document.getElementById('speed-label').innerText = this.value + 's'" class="w-32 accent-emerald-500">
+        </div>
+        <button id="btn-start-count" onclick="startCountDrill()" class="w-full bg-emerald-500 active:bg-emerald-600 text-slate-950 font-extrabold py-3 rounded-xl shadow">SPUSTIT TRÉNINK POČÍTÁNÍ</button>
+      </div>
+    </section>
+
+    <!-- ================= 3. REÁLNÁ HRA (SIMULÁTOR) ================= -->
+    <section id="view-game" class="p-4 h-full hidden flex-col justify-between">
+      <div>
+        <!-- Stav boty a počítání -->
+        <div class="flex justify-between items-center bg-slate-900 px-3 py-2 rounded-xl border border-slate-800 text-xs mb-3">
+          <div>💰 Bank: <b id="game-bank" class="text-emerald-400">1000</b> $</div>
+          <div>Sázka: <b id="game-bet" class="text-yellow-400">25</b> $</div>
+          <button onclick="toggleGameCountHUD()" class="bg-slate-800 px-2.5 py-1 rounded border border-slate-700 font-mono text-[11px]">
+            👁️ <span id="game-hud-count">RC: ? | TC: ?</span>
+          </button>
+        </div>
+
+        <!-- Herní stůl -->
+        <div class="table-felt rounded-2xl p-4 border border-emerald-800 min-h-[260px] flex flex-col justify-between relative">
+          <div class="text-center">
+            <span class="text-[10px] uppercase tracking-wider text-emerald-200/70 block mb-1">Dealer (<span id="game-dealer-score">?</span>)</span>
+            <div id="game-dealer-cards" class="flex justify-center space-x-1.5 min-h-[98px]"></div>
+          </div>
+
+          <!-- Trenérské hlášky uprostřed stolu -->
+          <div id="game-coach-banner" class="my-2 text-center text-xs font-bold px-2 py-1.5 rounded bg-slate-950/80 border border-slate-800 hidden"></div>
+
+          <div class="text-center">
+            <div id="game-player-cards" class="flex justify-center space-x-1.5 min-h-[98px] mb-1"></div>
+            <span class="text-[10px] uppercase tracking-wider text-emerald-200/90 font-bold block">Hráč (<span id="game-player-score">0</span>)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ovládání hry -->
+      <div class="mt-3">
+        <!-- Fáze sázek -->
+        <div id="game-bet-controls" class="space-y-2">
+          <div class="flex justify-center space-x-2">
+            <button onclick="changeBet(10)" class="bg-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-700">+10$</button>
+            <button onclick="changeBet(25)" class="bg-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-700">+25$</button>
+            <button onclick="changeBet(100)" class="bg-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-700">+100$</button>
+            <button onclick="resetBet()" class="bg-rose-950 text-rose-300 px-3 py-1.5 rounded-lg text-xs font-bold border border-rose-800">Reset (25$)</button>
+          </div>
+          <button onclick="dealGameHand()" class="w-full bg-emerald-500 active:bg-emerald-600 text-slate-950 font-extrabold py-3.5 rounded-xl shadow text-base">ROZDAT KARTY (DEAL)</button>
+        </div>
+
+        <!-- Fáze rozhodování v kole -->
+        <div id="game-action-controls" class="hidden grid grid-cols-2 gap-2">
+          <button onclick="gameAction('H')" class="bg-slate-100 text-slate-950 font-extrabold py-3 rounded-xl">HIT</button>
+          <button onclick="gameAction('S')" class="bg-yellow-500 text-slate-950 font-extrabold py-3 rounded-xl">STAND</button>
+          <button id="btn-game-double" onclick="gameAction('D')" class="bg-emerald-500 text-slate-950 font-extrabold py-3 rounded-xl">DOUBLE</button>
+          <button id="btn-game-sur" onclick="gameAction('SUR')" class="bg-teal-700 text-white font-bold py-3 rounded-xl text-xs">SURRENDER</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 4. TABULKA A STATISTIKY ================= -->
+    <section id="view-chart" class="p-4 hidden space-y-5 pb-10">
+      <!-- Statistiky -->
+      <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-emerald-400">Tvoje Statistiky</h2>
+          <button onclick="resetStats()" class="text-[11px] text-rose-400 underline">Vynulovat</button>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-center">
+          <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+            <div class="text-lg font-extrabold text-white" id="stat-hands">0</div>
+            <div class="text-[10px] text-slate-400 uppercase">Odehráno rukou</div>
+          </div>
+          <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+            <div class="text-lg font-extrabold text-emerald-400" id="stat-strat-acc">100%</div>
+            <div class="text-[10px] text-slate-400 uppercase">Přesnost tabulky</div>
+          </div>
+          <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+            <div class="text-lg font-extrabold text-sky-400" id="stat-count-acc">100%</div>
+            <div class="text-[10px] text-slate-400 uppercase">Trénink počítání</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Přepínač tabulky -->
+      <div>
+        <div class="flex space-x-1 bg-slate-900 p-1 rounded-xl border border-slate-800 mb-3 text-xs font-bold">
+          <button onclick="renderChartTable('HARD')" id="tab-chart-HARD" class="flex-1 py-1.5 rounded-lg bg-slate-800 text-emerald-400">Hard Totals</button>
+          <button onclick="renderChartTable('SOFT')" id="tab-chart-SOFT" class="flex-1 py-1.5 rounded-lg text-slate-400">Soft Totals</button>
+          <button onclick="renderChartTable('PAIR')" id="tab-chart-PAIR" class="flex-1 py-1.5 rounded-lg text-slate-400">Pairs & Sur</button>
+        </div>
+        <div id="chart-container" class="overflow-x-auto rounded-xl border border-slate-800"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- SPODNÍ NAVIGACE -->
+  <nav class="bg-slate-900 border-t border-slate-800 grid grid-cols-4 text-[11px] font-semibold shrink-0">
+    <button onclick="switchTab('drill')" id="nav-drill" class="py-2.5 flex flex-col items-center text-emerald-400">
+      <span class="text-lg">⚡</span><span>Dril Tabulky</span>
+    </button>
+    <button onclick="switchTab('count')" id="nav-count" class="py-2.5 flex flex-col items-center text-slate-400">
+      <span class="text-lg">🧠</span><span>Hi-Lo Počty</span>
+    </button>
+    <button onclick="switchTab('game')" id="nav-game" class="py-2.5 flex flex-col items-center text-slate-400">
+      <span class="text-lg">🎰</span><span>Reálná Hra</span>
+    </button>
+    <button onclick="switchTab('chart')" id="nav-chart" class="py-2.5 flex flex-col items-center text-slate-400">
+      <span class="text-lg">📊</span><span>Tabulka & Stat</span>
+    </button>
+  </nav>
+
+<script>
+// ==================== 1. DATA PODLE TVÉ FOTKY (BJA CHART) ====================
+const DEALER_COLS = ['2','3','4','5','6','7','8','9','10','A'];
+
+// Hard Totals: 17 down to 8
+const HARD_CHART = {
+  17: ['S','S','S','S','S','S','S','S','S','S'],
+  16: ['S','S','S','S','S','H','H','SUR','SUR','SUR'], // SUR pokud povoleno, jinak H
+  15: ['S','S','S','S','S','H','H','H','SUR','H'],
+  14: ['S','S','S','S','S','H','H','H','H','H'],
+  13: ['S','S','S','S','S','H','H','H','H','H'],
+  12: ['H','H','S','S','S','H','H','H','H','H'],
+  11: ['D','D','D','D','D','D','D','D','D','D'],
+  10: ['D','D','D','D','D','D','D','D','H','H'],
+   9: ['H','D','D','D','D','H','H','H','H','H'],
+   8: ['H','H','H','H','H','H','H','H','H','H']
+};
+
+// Soft Totals: A,9 (20) down to A,2 (13)
+const SOFT_CHART = {
+  9: ['S','S','S','S','S','S','S','S','S','S'],
+  8: ['S','S','S','S','Ds','S','S','S','S','S'],
+  7: ['Ds','Ds','Ds','Ds','Ds','S','S','H','H','H'],
+  6: ['H','D','D','D','D','H','H','H','H','H'],
+  5: ['H','H','D','D','D','H','H','H','H','H'],
+  4: ['H','H','D','D','D','H','H','H','H','H'],
+  3: ['H','H','H','D','D','H','H','H','H','H'],
+  2: ['H','H','H','D','D','H','H','H','H','H']
+};
+
+// Pair Splitting: A,A down to 2,2 (10 = T,T)
+const PAIR_CHART = {
+  'A': ['Y','Y','Y','Y','Y','Y','Y','Y','Y','Y'],
+  '10':['N','N','N','N','N','N','N','N','N','N'],
+  '9': ['Y','Y','Y','Y','Y','N','Y','Y','N','N'],
+  '8': ['Y','Y','Y','Y','Y','Y','Y','Y','Y','Y'],
+  '7': ['Y','Y','Y','Y','Y','Y','N','N','N','N'],
+  '6': ['YN','Y','Y','Y','Y','N','N','N','N','N'],
+  '5': ['N','N','N','N','N','N','N','N','N','N'],
+  '4': ['N','N','N','YN','YN','N','N','N','N','N'],
+  '3': ['YN','YN','Y','Y','Y','Y','N','N','N','N'],
+  '2': ['YN','YN','Y','Y','Y','Y','N','N','N','N']
+};
+
+// Nastavení a statistiky
+let settings = { das: true, sur: true };
+let stats = JSON.parse(localStorage.getItem('bj_wiz_stats')) || {
+  stratTotal: 0, stratCorrect: 0, countTotal: 0, countCorrect: 0
+};
+
+function saveStats() {
+  localStorage.setItem('bj_wiz_stats', JSON.stringify(stats));
+  updateStatsUI();
+}
+
+function updateSettings() {
+  settings.das = document.getElementById('toggle-das').checked;
+  settings.sur = document.getElementById('toggle-sur').checked;
+}
+
+function getHiLoValue(rank) {
+  if (['2','3','4','5','6'].includes(rank)) return 1;
+  if (['7','8','9'].includes(rank)) return 0;
+  return -1; // 10, J, Q, K, A
+}
+
+function createCardHTML(rank, suit = '♠', faceDown = false) {
+  if (faceDown) return `<div class="playing-card back"></div>`;
+  const isRed = suit === '♥' || suit === '♦';
+  return `
+    <div class="playing-card ${isRed ? 'red' : 'black'}">
+      <div class="text-xs leading-none">${rank}<br>${suit}</div>
+      <div class="text-2xl self-center">${suit}</div>
+      <div class="text-xs leading-none self-end rotate-180">${rank}<br>${suit}</div>
+    </div>`;
+}
+
+// ==================== 2. VYHODNOCENÍ ZÁKLADNÍ STRATEGIE ====================
+function getCorrectAction(pCards, dealerUp, canDouble = true, canSplit = true) {
+  const dIdx = DEALER_COLS.indexOf(dealerUp === 'J' || dealerUp === 'Q' || dealerUp === 'K' ? '10' : dealerUp);
+  const normRank = r => ['J','Q','K'].includes(r) ? '10' : r;
+
+  // 1. Kontrola Párů (Pair Splitting)
+  if (canSplit && pCards.length === 2 && normRank(pCards[0]) === normRank(pCards[1])) {
+    const pairKey = normRank(pCards[0]);
+    const code = PAIR_CHART[pairKey][dIdx];
+    if (code === 'Y' || (code === 'YN' && settings.das)) {
+      return { action: 'P', code, reason: `Pár ${pairKey},${pairKey} proti ${dealerUp} se vždy dělí (SPLIT).` };
+    }
+  }
+
+  // Spočítat součet a měkké eso
+  let total = 0, aces = 0;
+  for (let r of pCards) {
+    if (r === 'A') { total += 11; aces++; }
+    else if (['10','J','Q','K'].includes(r)) total += 10;
+    else total += parseInt(r);
+  }
+  while (total > 21 && aces > 0) { total -= 10; aces--; }
+  const isSoft = aces > 0 && total <= 21;
+
+  // 2. Měkké součty (Soft Totals)
+  if (isSoft && total >= 13 && total <= 20) {
+    const otherCard = total - 11;
+    const code = SOFT_CHART[otherCard][dIdx];
+    if (code === 'Ds') {
+      return { action: canDouble ? 'D' : 'S', code, reason: `Soft A,${otherCard} proti ${dealerUp} je Ds (Double pokud lze, jinak Stand).` };
+    }
+    if (code === 'D') {
+      return { action: canDouble ? 'D' : 'H', code, reason: `Soft A,${otherCard} proti ${dealerUp} je D (Double pokud lze, jinak Hit).` };
+    }
+    return { action: code, code, reason: `Soft A,${otherCard} proti ${dealerUp} → ${code}.` };
+  }
+
+  // 3. Tvrdé součty (Hard Totals)
+  const clampedTotal = Math.max(8, Math.min(17, total));
+  const code = HARD_CHART[clampedTotal][dIdx];
+  if (code === 'SUR') {
+    if (settings.sur && pCards.length === 2) {
+      return { action: 'SUR', code, reason: `Hard ${total} proti ${dealerUp} se vzdává (SURRENDER).` };
+    }
+    return { action: 'H', code: 'H', reason: `Hard ${total} proti ${dealerUp} (Surrender vypnutý → HIT).` };
+  }
+  if (code === 'D') {
+    return { action: canDouble ? 'D' : 'H', code, reason: `Hard ${total} proti ${dealerUp} je Double (jinak Hit).` };
+  }
+  return { action: code, code, reason: `Hard ${total} proti ${dealerUp} → ${code}.` };
+}
+
+// ==================== 3. REŽIM 1: DRIL STRATEGIE ====================
+let currentDrill = {};
+const RANKS = ['2','3','4','5','6','7','8','9','10','A'];
+const SUITS = ['♠','♥','♦','♣'];
+const randItem = arr => arr[Math.floor(Math.random() * arr.length)];
+
+function nextDrillHand() {
+  const filter = document.getElementById('drill-filter').value;
+  const dealer = randItem(RANKS);
+  let p1, p2;
+
+  if (filter === 'PAIR') {
+    p1 = randItem(RANKS); p2 = p1;
+  } else if (filter === 'SOFT') {
+    p1 = 'A'; p2 = randItem(['2','3','4','5','6','7','8','9']);
+  } else if (filter === 'HARD') {
+    p1 = randItem(['2','3','4','5','6','7','8','9','10']);
+    p2 = randItem(['2','3','4','5','6','7','8','9','10']);
+    if (p1 === p2) p2 = p1 === '10' ? '9' : '10';
+  } else {
+    p1 = randItem(RANKS); p2 = randItem(RANKS);
+    if (p1 === 'A' && p2 === '10') p2 = '7'; // Vynechat čistý Blackjack v drilu
+  }
+
+  currentDrill = { pCards: [p1, p2], dealer };
+  document.getElementById('drill-dealer-card').innerHTML = createCardHTML(dealer, randItem(SUITS));
+  document.getElementById('drill-player-cards').innerHTML =
+    createCardHTML(p1, randItem(SUITS)) + createCardHTML(p2, randItem(SUITS));
+  document.getElementById('drill-player-label').innerText = `Tvoje ruka: ${p1} , ${p2}`;
+  const fb = document.getElementById('drill-feedback');
+  fb.innerText = 'Zvol správné rozhodnutí podle tabulky';
+  fb.className = 'text-center my-2 min-h-[44px] flex items-center justify-center px-3 py-1 rounded-lg font-medium text-xs text-emerald-200/70';
+}
+
+function submitDrillAction(userAct) {
+  const res = getCorrectAction(currentDrill.pCards, currentDrill.dealer, true, true);
+  stats.stratTotal++;
+  const fb = document.getElementById('drill-feedback');
+
+  if (userAct === res.action) {
+    stats.stratCorrect++;
+    fb.innerText = `✅ Správně! (${res.reason})`;
+    fb.className = 'text-center my-2 min-h-[44px] flex items-center justify-center px-3 py-1 rounded-lg font-bold text-xs bg-emerald-950/90 text-emerald-300 border border-emerald-600';
+    saveStats();
+    setTimeout(nextDrillHand, 750);
+  } else {
+    fb.innerText = `❌ Chyba! Správně je ${res.action === 'P' ? 'SPLIT' : res.action}. ${res.reason}`;
+    fb.className = 'text-center my-2 min-h-[44px] flex items-center justify-center px-3 py-1 rounded-lg font-bold text-xs bg-rose-950/90 text-rose-300 border border-rose-600';
+    saveStats();
+  }
+}
+
+// ==================== 4. REŽIM 2: TRÉNINK POČÍTÁNÍ (HI-LO) ====================
+let countTimer = null;
+let drillRunningCount = 0;
+
+function startCountDrill() {
+  clearInterval(countTimer);
+  drillRunningCount = 0;
+  let step = 0;
+  const totalSteps = 20;
+  const speedMs = parseFloat(document.getElementById('count-speed').value) * 1000;
+
+  document.getElementById('count-answer-box').classList.add('hidden');
+  document.getElementById('count-result-msg').innerText = '';
+  document.getElementById('btn-start-count').innerText = 'RESTARTOVAT DRIL';
+
+  countTimer = setInterval(() => {
+    if (step >= totalSteps) {
+      clearInterval(countTimer);
+      document.getElementById('count-card-slot').innerHTML = `<span class="text-emerald-300 font-bold">Konec balíčku! Zadej součet.</span>`;
+      document.getElementById('count-Value-hint').innerText = '';
+      document.getElementById('count-answer-box').classList.remove('hidden');
+      return;
+    }
+    step++;
+    const rank = randItem(['2','3','4','5','6','7','8','9','10','J','Q','K','A']);
+    const val = getHiLoValue(rank);
+    drillRunningCount += val;
+
+    document.getElementById('count-progress').innerText = `${step}/${totalSteps}`;
+    document.getElementById('count-card-slot').innerHTML = createCardHTML(rank, randItem(SUITS));
+    document.getElementById('count-Value-hint').innerText = `Hodnota karty: ${val > 0 ? '+1' : val}`;
+  }, speedMs);
+}
+
+function adjustCountInput(delta) {
+  const inp = document.getElementById('count-user-input');
+  inp.value = parseInt(inp.value || 0) + delta;
+}
+
+function verifyCountDrill() {
+  const userVal = parseInt(document.getElementById('count-user-input').value || 0);
+  const msg = document.getElementById('count-result-msg');
+  stats.countTotal++;
+  if (userVal === drillRunningCount) {
+    stats.countCorrect++;
+    msg.innerText = `🎯 Přesně tak! Running Count byl ${drillRunningCount}.`;
+    msg.className = 'mt-3 text-center font-bold text-sm text-emerald-400';
+  } else {
+    msg.innerText = `❌ Vedle! Tvůj tip: ${userVal}, skutečný Running Count: ${drillRunningCount}.`;
+    msg.className = 'mt-3 text-center font-bold text-sm text-rose-400';
+  }
+  document.getElementById('count-answer-box').classList.add('hidden');
+  saveStats();
+}
+
+// ==================== 5. REŽIM 3: REÁLNÁ HRA SE 6 BALÍČKY ====================
+let shoe = [], gameRC = 0, showCountHUD = false;
+let bankroll = 1000, currentBet = 25;
+let gamePlayer = [], gameDealer = [], gameActive = false;
+
+function initShoe() {
+  shoe = []; gameRC = 0;
+  const fullRanks = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+  for (let d = 0; d < 6; d++) {
+    for (let s of SUITS) for (let r of fullRanks) shoe.push({ r, s });
+  }
+  shoe.sort(() => Math.random() - 0.5);
+}
+initShoe();
+
+function drawCard(countIt = true) {
+  if (shoe.length < 30) initShoe();
+  const c = shoe.pop();
+  if (countIt) gameRC += getHiLoValue(c.r);
+  updateGameCountHUD();
+  return c;
+}
+
+function handTotal(cards) {
+  let t = 0, a = 0;
+  for (let c of cards) {
+    if (c.r === 'A') { t += 11; a++; }
+    else if (['10','J','Q','K'].includes(c.r)) t += 10;
+    else t += parseInt(c.r);
+  }
+  while (t > 21 && a > 0) { t -= 10; a--; }
+  return t;
+}
+
+function toggleGameCountHUD() {
+  showCountHUD = !showCountHUD;
+  updateGameCountHUD();
+}
+
+function updateGameCountHUD() {
+  const el = document.getElementById('game-hud-count');
+  if (!showCountHUD) { el.innerText = 'RC: ? | TC: ?'; return; }
+  const decksLeft = Math.max(1, (shoe.length / 52).toFixed(1));
+  const tc = (gameRC / decksLeft).toFixed(1);
+  el.innerText = `RC: ${gameRC > 0 ? '+'+gameRC : gameRC} | TC: ${tc}`;
+}
+
+function changeBet(amount) {
+  if (bankroll >= currentBet + amount) currentBet += amount;
+  document.getElementById('game-bet').innerText = currentBet;
+}
+function resetBet() {
+  currentBet = 25;
+  document.getElementById('game-bet').innerText = currentBet;
+}
+
+function dealGameHand() {
+  if (bankroll < currentBet) { bankroll = 1000; }
+  bankroll -= currentBet;
+  document.getElementById('game-bank').innerText = bankroll;
+
+  gamePlayer = [drawCard(true), drawCard(true)];
+  gameDealer = [drawCard(true), drawCard(false)]; // 2. karta dealera skrytá
+  gameActive = true;
+
+  document.getElementById('game-coach-banner').classList.add('hidden');
+  document.getElementById('game-bet-controls').classList.add('hidden');
+  document.getElementById('game-action-controls').classList.remove('hidden');
+
+  renderGameTable(true);
+  if (handTotal(gamePlayer) === 21) endGameRound();
+}
+
+function renderGameTable(hideHoleCard) {
+  document.getElementById('game-player-cards').innerHTML = gamePlayer.map(c => createCardHTML(c.r, c.s)).join('');
+  document.getElementById('game-player-score').innerText = handTotal(gamePlayer);
+
+  if (hideHoleCard) {
+    document.getElementById('game-dealer-cards').innerHTML =
+      createCardHTML(gameDealer[0].r, gameDealer[0].s) + createCardHTML('', '', true);
+    document.getElementById('game-dealer-score').innerText = gameDealer[0].r;
+  } else {
+    document.getElementById('game-dealer-cards').innerHTML = gameDealer.map(c => createCardHTML(c.r, c.s)).join('');
+    document.getElementById('game-dealer-score').innerText = handTotal(gameDealer);
+  }
+}
+
+function gameAction(act) {
+  if (!gameActive) return;
+
+  // Kontrola trenéra oproti tabulce
+  const pRanks = gamePlayer.map(c => c.r);
+  const advice = getCorrectAction(pRanks, gameDealer[0].r, gamePlayer.length === 2, false);
+  const banner = document.getElementById('game-coach-banner');
+  stats.stratTotal++;
+
+  if (act === advice.action) {
+    stats.stratCorrect++;
+    banner.innerText = `✅ Správný tah podle tabulky (${advice.code})`;
+    banner.className = 'my-2 text-center text-xs font-bold px-2 py-1.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-700';
+  } else {
+    banner.innerText = `⚠️ Chyba strategie! Tabulka velí: ${advice.action} (${advice.reason})`;
+    banner.className = 'my-2 text-center text-xs font-bold px-2 py-1.5 rounded bg-rose-950/90 text-rose-300 border border-rose-700';
+  }
+  banner.classList.remove('hidden');
+  saveStats();
+
+  if (act === 'SUR' && gamePlayer.length === 2) {
+    bankroll += Math.floor(currentBet / 2);
+    finishRoundUI('Vzdal jsi hru (Surrender) – vrácena polovina sázky.');
+    return;
+  }
+  if (act === 'D' && gamePlayer.length === 2) {
+    bankroll -= currentBet;
+    currentBet *= 2;
+    gamePlayer.push(drawCard(true));
+    renderGameTable(true);
+    endGameRound();
+    return;
+  }
+  if (act === 'H') {
+    gamePlayer.push(drawCard(true));
+    renderGameTable(true);
+    if (handTotal(gamePlayer) >= 21) endGameRound();
+  } else if (act === 'S') {
+    endGameRound();
+  }
+}
+
+function endGameRound() {
+  gameActive = false;
+  // Započítat skrytou kartu dealera do Hi-Lo
+  gameRC += getHiLoValue(gameDealer[1].r);
+  updateGameCountHUD();
+
+  const pScore = handTotal(gamePlayer);
+  if (pScore <= 21) {
+    while (handTotal(gameDealer) < 17) {
+      gameDealer.push(drawCard(true));
+    }
+  }
+  renderGameTable(false);
+  const dScore = handTotal(gameDealer);
+
+  let msg = '';
+  if (pScore > 21) {
+    msg = `💥 Přetáhl jsi (${pScore})! Prohra.`;
+  } else if (dScore > 21 || pScore > dScore) {
+    bankroll += currentBet * 2;
+    msg = `🏆 Výhra! (${pScore} vs ${dScore})`;
+  } else if (pScore === dScore) {
+    bankroll += currentBet;
+    msg = `🤝 Push / Remíza (${pScore}).`;
+  } else {
+    msg = `❌ Dealer vyhrál (${dScore} vs ${pScore}).`;
+  }
+  if (currentBet > 25) currentBet = 25;
+  finishRoundUI(msg);
+}
+
+function finishRoundUI(resultText) {
+  document.getElementById('game-bank').innerText = bankroll;
+  document.getElementById('game-bet').innerText = currentBet;
+  const banner = document.getElementById('game-coach-banner');
+  banner.innerText += ` | ${resultText}`;
+  banner.classList.remove('hidden');
+  document.getElementById('game-action-controls').classList.add('hidden');
+  document.getElementById('game-bet-controls').classList.remove('hidden');
+}
+
+// ==================== 6. VYKRESLENÍ REFERENČNÍ TABULKY A STATISTIK ====================
+function renderChartTable(type) {
+  ['HARD','SOFT','PAIR'].forEach(t => {
+    const btn = document.getElementById('tab-chart-' + t);
+    btn.className = t === type
+      ? 'flex-1 py-1.5 rounded-lg bg-slate-800 text-emerald-400'
+      : 'flex-1 py-1.5 rounded-lg text-slate-400';
+  });
+
+  let html = `<table class="w-full text-center text-[11px] border-collapse"><thead><tr class="bg-slate-900 text-slate-300"><th class="p-1.5 border border-slate-800">Ruka</th>`;
+  DEALER_COLS.forEach(d => html += `<th class="p-1.5 border border-slate-800">${d}</th>`);
+  html += `</tr></thead><tbody>`;
+
+  if (type === 'HARD') {
+    for (let r = 17; r >= 8; r--) {
+      html += `<tr><td class="bg-slate-900 font-bold p-1.5 border border-slate-800">${r}</td>`;
+      HARD_CHART[r].forEach(c => html += `<td class="cell-${c} p-1.5 border border-slate-800/40">${c}</td>`);
+      html += `</tr>`;
+    }
+  } else if (type === 'SOFT') {
+    for (let r = 9; r >= 2; r--) {
+      html += `<tr><td class="bg-slate-900 font-bold p-1.5 border border-slate-800">A,${r}</td>`;
+      SOFT_CHART[r].forEach(c => html += `<td class="cell-${c} p-1.5 border border-slate-800/40">${c}</td>`);
+      html += `</tr>`;
+    }
+  } else {
+    const order = ['A','10','9','8','7','6','5','4','3','2'];
+    order.forEach(k => {
+      const label = k === '10' ? 'T,T' : `${k},${k}`;
+      html += `<tr><td class="bg-slate-900 font-bold p-1.5 border border-slate-800">${label}</td>`;
+      PAIR_CHART[k].forEach(c => {
+        const disp = c === 'YN' ? 'Y/N' : c;
+        html += `<td class="cell-${c} p-1.5 border border-slate-800/40">${disp}</td>`;
+      });
+      html += `</tr>`;
+    });
+  }
+  html += `</tbody></table>`;
+  document.getElementById('chart-container').innerHTML = html;
+}
+
+function updateStatsUI() {
+  const sAcc = stats.stratTotal ? Math.round((stats.stratCorrect / stats.stratTotal) * 100) + '%' : '100%';
+  const cAcc = stats.countTotal ? Math.round((stats.countCorrect / stats.countTotal) * 100) + '%' : '100%';
+  document.getElementById('header-accuracy').innerText = sAcc;
+  document.getElementById('stat-hands').innerText = stats.stratTotal;
+  document.getElementById('stat-strat-acc').innerText = sAcc;
+  document.getElementById('stat-count-acc').innerText = cAcc;
+}
+
+function resetStats() {
+  stats = { stratTotal: 0, stratCorrect: 0, countTotal: 0, countCorrect: 0 };
+  saveStats();
+}
+
+function switchTab(tab) {
+  ['drill','count','game','chart'].forEach(t => {
+    document.getElementById('view-' + t).classList.add('hidden');
+    document.getElementById('view-' + t).classList.remove('flex');
+    document.getElementById('nav-' + t).className = 'py-2.5 flex flex-col items-center text-slate-400';
+  });
+  const activeView = document.getElementById('view-' + tab);
+  activeView.classList.remove('hidden');
+  if (tab !== 'chart') activeView.classList.add('flex');
+  document.getElementById('nav-' + tab).className = 'py-2.5 flex flex-col items-center text-emerald-400';
+}
+
+// Inicializace po načtení
+nextDrillHand();
+renderChartTable('HARD');
+updateStatsUI();
+</script>
+</body>
+</html>
