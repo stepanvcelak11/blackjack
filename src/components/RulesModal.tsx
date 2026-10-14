@@ -71,12 +71,39 @@ export function RulesModal({ open, onClose }: Props) {
                   </li>
                 </ul>
               </Section>
+              <Section title="Jednička = eso (měkká ruka)">
+                <div className="flex items-start gap-2">
+                  <DieFace value={1} size={30} />
+                  <p>
+                    Jednička se počítá jako <b>1 nebo 4</b>. Hra automaticky bere 4, pokud tím nepřetáhnete 12, jinak
+                    se jednička „zlomí“ na 1. Měkkou ruku poznáte podle dvou hodnot (např. <b>5 / 8</b>) a štítku{' '}
+                    <span className="rounded-full bg-red-600 px-1.5 text-[10px] font-black text-white uppercase">
+                      Měkká
+                    </span>
+                    .
+                  </p>
+                </div>
+              </Section>
               <Section title="Tropa a automatický stop">
-                Součet 13 a více = <b className="text-red-400">tropa</b>, ruka okamžitě prohrává. Při přesně 12 tah
-                ruky končí automaticky.
+                Tvrdý součet 13 a více = <b className="text-red-400">tropa</b>, ruka okamžitě prohrává. Při přesně 12
+                tah ruky končí automaticky.
+              </Section>
+              <Section title="4-Kostkový Charlie">
+                Nasbíráte-li v jedné ruce <b>4 kostky</b> bez tropy, ruka okamžitě vyhrává <b>2 : 1</b> bez ohledu na
+                krupiéra.
+              </Section>
+              <Section title="Bezpečný příhoz (d3) – Ostrostřelec">
+                <div className="flex items-start gap-2">
+                  <DieFace value={2} size={30} tone="metal" />
+                  <p>
+                    Při součtu <b>8, 9 nebo 10</b> si můžete koupit cinknutou kovovou kostku, na které padá jen{' '}
+                    <b>1, 2 nebo 3</b>. Stojí <b>50 % sázky</b> ruky (nevratně) a lze ji použít jen jednou za kolo.
+                  </p>
+                </div>
               </Section>
               <Section title="Krupiér">
-                Odkryje kelímek, až dohrajete. Přihazuje při součtu <b>8 a méně</b>, stojí při <b>9 a více</b>.
+                Odkryje kelímek, až dohrajete. Přihazuje při součtu <b>8 a méně</b> a také na <b>měkkou 9</b> (např. 1 +
+                5). Stojí na <b>tvrdé 9</b> a výš.
               </Section>
               <Section title="Výplaty">
                 <table className="w-full text-left">
@@ -90,6 +117,12 @@ export function RulesModal({ open, onClose }: Props) {
                       <td className="text-right font-bold">2 : 1</td>
                     </tr>
                     <tr>
+                      <td>
+                        <b className="text-fuchsia-300">4-Kostkový Charlie</b>
+                      </td>
+                      <td className="text-right font-bold">2 : 1</td>
+                    </tr>
+                    <tr>
                       <td>Výhra (blíž k 12 / krupiér v tropě)</td>
                       <td className="text-right font-bold">1 : 1</td>
                     </tr>
@@ -97,11 +130,27 @@ export function RulesModal({ open, onClose }: Props) {
                       <td>Shoda (remíza)</td>
                       <td className="text-right font-bold">vklad zpět</td>
                     </tr>
+                    <tr>
+                      <td>
+                        Vedlejší sázka <b className="text-fuchsia-300">Pár</b> (2 stejné úvodní kostky)
+                      </td>
+                      <td className="text-right font-bold">4 : 1</td>
+                    </tr>
                   </tbody>
                 </table>
                 <p className="mt-2 text-xs text-slate-400">
                   DiceJack platí jen z prvních dvou kostek (ne po rozdělení). Když DiceJack má i krupiér, je to remíza.
+                  Sázku na pár zvolíte klepnutím na menší kruh vedle hlavní sázky – vyplácí se hned po rozdání a pár
+                  pak můžete normálně rozdělit.
                 </p>
+              </Section>
+              <Section title="Hot Streak 🔥">
+                Při <b>3 vyhraných kolech v řadě</b> se rozhoří plamen kolem bankrollu. Každá další výhra v sérii
+                dostane od kasina bonus <b>+20 %</b> z čisté výhry. Remíza sérii nepřeruší, prohra ano.
+              </Section>
+              <Section title="Ovládání">
+                <b>Hodit kostky</b> a <b>Přihodit</b> stačí klepnout – nebo tlačítko <b>podržte</b>, kostky se v
+                kelímku roztřesou a padnou, až prst pustíte.
               </Section>
               <Section title="Barva součtu">
                 <div className="flex flex-wrap gap-2 text-xs font-bold">

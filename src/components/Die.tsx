@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
-import type { Die as DieModel, DieValue } from '../lib/gameRules';
+import type { Die as DieModel, DieKind, DieValue } from '../lib/gameRules';
 
 // Pozice teček v mřížce 3×3 (index 0–8).
 const PIPS: Record<DieValue, number[]> = {
@@ -15,13 +15,41 @@ const PIPS: Record<DieValue, number[]> = {
 interface FaceProps {
   value: DieValue | null;
   size: number;
-  tone?: 'ivory' | 'gold';
+  tone?: 'ivory' | 'gold' | 'metal';
 }
+
+const FACE_STYLES = {
+  ivory: {
+    background: 'linear-gradient(145deg,#ffffff 0%,#f5f0e6 55%,#d9d0bf 100%)',
+    boxShadow: 'inset 0 2px 1px rgba(255,255,255,.9), inset 0 -4px 6px rgba(120,100,70,.35), 0 6px 14px rgba(0,0,0,.55)',
+    border: '1px solid #e7dcc6',
+    pip: 'radial-gradient(circle at 35% 30%,#44403c,#0c0a09 70%)',
+  },
+  gold: {
+    background: 'linear-gradient(145deg,#fde68a 0%,#f59e0b 55%,#b45309 100%)',
+    boxShadow:
+      'inset 0 2px 1px rgba(255,255,255,.7), inset 0 -4px 6px rgba(120,53,15,.45), 0 6px 14px rgba(0,0,0,.55), 0 0 18px rgba(251,191,36,.45)',
+    border: '1px solid #fcd34d',
+    pip: 'radial-gradient(circle at 35% 30%,#57534e,#0c0a09 70%)',
+  },
+  // Cinknutá kostka d3 – leštěný kov se zlatým lemem.
+  metal: {
+    background:
+      'linear-gradient(135deg,#f8fafc 0%,#94a3b8 22%,#e2e8f0 45%,#64748b 70%,#cbd5e1 100%)',
+    boxShadow:
+      'inset 0 2px 1px rgba(255,255,255,.9), inset 0 -4px 6px rgba(15,23,42,.45), 0 6px 14px rgba(0,0,0,.55), 0 0 0 2px #f59e0b, 0 0 16px rgba(245,158,11,.55)',
+    border: '1px solid #f8fafc',
+    pip: 'radial-gradient(circle at 35% 30%,#fde68a,#b45309 75%)',
+  },
+} as const;
 
 export function DieFace({ value, size, tone = 'ivory' }: FaceProps) {
   const pip = Math.max(5, Math.round(size * 0.17));
   const pad = Math.round(size * 0.16);
-  const isGold = tone === 'gold';
+  const look = FACE_STYLES[tone];
+  const isAce = value === 1;
+  // Jednička = „eso“: velká zářivá rudo-zlatá tečka.
+  const acePip = Math.round(size * 0.34);
   return (
     <div
       className="relative grid grid-cols-3 grid-rows-3 place-items-center"
@@ -30,33 +58,38 @@ export function DieFace({ value, size, tone = 'ivory' }: FaceProps) {
         height: size,
         padding: pad,
         borderRadius: size * 0.22,
-        background: isGold
-          ? 'linear-gradient(145deg,#fde68a 0%,#f59e0b 55%,#b45309 100%)'
-          : 'linear-gradient(145deg,#ffffff 0%,#f5f0e6 55%,#d9d0bf 100%)',
-        boxShadow: isGold
-          ? 'inset 0 2px 1px rgba(255,255,255,.7), inset 0 -4px 6px rgba(120,53,15,.45), 0 6px 14px rgba(0,0,0,.55), 0 0 18px rgba(251,191,36,.45)'
-          : 'inset 0 2px 1px rgba(255,255,255,.9), inset 0 -4px 6px rgba(120,100,70,.35), 0 6px 14px rgba(0,0,0,.55)',
-        border: isGold ? '1px solid #fcd34d' : '1px solid #e7dcc6',
+        background: look.background,
+        boxShadow: look.boxShadow,
+        border: look.border,
       }}
     >
-      {Array.from({ length: 9 }, (_, i) => (
+      {Array.from({ length: 9 }, (_, i) => {
+        const on = !!value && PIPS[value].includes(i);
+        const ace = isAce && on;
+        return (
+          <span
+            key={i}
+            className="rounded-full"
+            style={{
+              width: ace ? acePip : pip,
+              height: ace ? acePip : pip,
+              opacity: on ? 1 : 0,
+              background: ace ? 'radial-gradient(circle at 35% 30%,#fecaca 0%,#ef4444 35%,#991b1b 80%)' : look.pip,
+              boxShadow: ace
+                ? '0 0 0 2px #fbbf24, 0 0 10px rgba(239,68,68,.8), inset 0 1px 2px rgba(0,0,0,.5)'
+                : 'inset 0 1px 2px rgba(0,0,0,.7)',
+            }}
+          />
+        );
+      })}
+      {tone === 'metal' && (
         <span
-          key={i}
-          className="rounded-full"
-          style={{
-            width: pip,
-            height: pip,
-            opacity: value && PIPS[value].includes(i) ? 1 : 0,
-            background:
-              value === 1 && !isGold
-                ? 'radial-gradient(circle at 35% 30%,#f87171,#b91c1c 70%)'
-                : isGold
-                  ? 'radial-gradient(circle at 35% 30%,#57534e,#0c0a09 70%)'
-                  : 'radial-gradient(circle at 35% 30%,#44403c,#0c0a09 70%)',
-            boxShadow: 'inset 0 1px 2px rgba(0,0,0,.7)',
-          }}
-        />
-      ))}
+          className="absolute right-[6%] bottom-[3%] font-black text-amber-700"
+          style={{ fontSize: Math.max(7, size * 0.17) }}
+        >
+          d3
+        </span>
+      )}
     </div>
   );
 }
@@ -70,18 +103,19 @@ interface DieProps {
   from?: 'top' | 'bottom';
 }
 
-const randomFace = (): DieValue => (Math.floor(Math.random() * 6) + 1) as DieValue;
+const randomFace = (kind: DieKind = 'd6'): DieValue =>
+  (Math.floor(Math.random() * (kind === 'd3' ? 3 : 6)) + 1) as DieValue;
 
 export function Die({ die, size, gold = false, from = 'bottom' }: DieProps) {
-  const [flicker, setFlicker] = useState<DieValue>(randomFace);
+  const [flicker, setFlicker] = useState<DieValue>(() => randomFace(die.kind));
   const spin = useMemo(() => (Math.random() > 0.5 ? 1 : -1) * (360 + Math.floor(Math.random() * 180)), []);
 
   // Během hodu rychle střídáme náhodné strany.
   useEffect(() => {
     if (die.settled) return;
-    const t = setInterval(() => setFlicker(randomFace()), 70);
+    const t = setInterval(() => setFlicker(randomFace(die.kind)), 70);
     return () => clearInterval(t);
-  }, [die.settled]);
+  }, [die.settled, die.kind]);
 
   const shown: DieValue | null = die.hidden ? null : die.settled ? die.value : flicker;
 
@@ -105,7 +139,7 @@ export function Die({ die, size, gold = false, from = 'bottom' }: DieProps) {
         animate={{ scale: 1 }}
         transition={{ type: 'spring', stiffness: 500, damping: 18 }}
       >
-        <DieFace value={shown} size={size} tone={gold ? 'gold' : 'ivory'} />
+        <DieFace value={shown} size={size} tone={die.kind === 'd3' ? 'metal' : gold ? 'gold' : 'ivory'} />
       </motion.div>
     </motion.div>
   );

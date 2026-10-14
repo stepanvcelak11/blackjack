@@ -1,5 +1,5 @@
 import { AnimatePresence } from 'framer-motion';
-import { isNatural, visibleTotal, type Die as DieModel } from '../lib/gameRules';
+import { isNatural, visibleScore, type Die as DieModel } from '../lib/gameRules';
 import { DealerCup } from './DealerCup';
 import { Die } from './Die';
 import { ScoreBadge } from './ScoreBadge';
@@ -11,7 +11,7 @@ interface Props {
 }
 
 export function DealerZone({ dice, dieSize, thinking }: Props) {
-  const sum = visibleTotal(dice);
+  const sc = visibleScore(dice);
   const hidden = dice.some((d) => d.hidden);
   const natural = !hidden && isNatural(dice) && dice.every((d) => d.settled);
   const size = dice.length > 4 ? Math.round(dieSize * 0.8) : dieSize;
@@ -21,7 +21,7 @@ export function DealerZone({ dice, dieSize, thinking }: Props) {
       <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-emerald-100/70">
         <span>Krupiér</span>
         {dice.some((d) => d.settled) && (
-          <ScoreBadge value={sum} neutral suffix={hidden ? '+ ?' : undefined} />
+          <ScoreBadge score={sc} neutral suffix={hidden ? '+ ?' : undefined} />
         )}
         {thinking && <span className="animate-pulse normal-case tracking-normal text-amber-200">hází…</span>}
       </div>

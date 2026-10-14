@@ -62,3 +62,37 @@ button {
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.06'/%3E%3C/svg%3E"),
     radial-gradient(circle at 50% 35%, #0f6b4c 0%, #064e3b 55%, #022c22 100%);
 }
+
+/* Dlouhý stisk na mobilu nesmí otevřít kontextové menu. */
+.no-callout {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* „Podrž a zatřes“ */
+@keyframes shake-hard {
+  0% { transform: translate(0, 0) rotate(0); }
+  20% { transform: translate(-7px, 3px) rotate(-9deg); }
+  40% { transform: translate(6px, -4px) rotate(8deg); }
+  60% { transform: translate(-5px, -2px) rotate(-6deg); }
+  80% { transform: translate(7px, 3px) rotate(10deg); }
+  100% { transform: translate(0, 0) rotate(0); }
+}
+@keyframes shake-soft {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  25% { transform: translate(-3px, 1px) rotate(-3deg); }
+  75% { transform: translate(3px, -1px) rotate(3deg); }
+}
+@keyframes dice-jump {
+  0%, 100% { transform: translateY(18px) rotate(0); }
+  50% { transform: translateY(-6px) rotate(160deg); }
+}
+.shake-hard { animation: shake-hard 0.16s linear infinite; }
+.shake-soft { animation: shake-soft 0.12s linear infinite; }
+.dice-jump-a { animation: dice-jump 0.22s ease-in-out infinite; }
+.dice-jump-b { animation: dice-jump 0.22s ease-in-out infinite 0.11s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .shake-hard, .shake-soft, .dice-jump-a, .dice-jump-b { animation-duration: 0.6s; }
+}

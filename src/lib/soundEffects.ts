@@ -174,3 +174,78 @@ export function playButton(): void {
     tone(ac, now, 900, 0.05, 0.05, 'sine', 600);
   });
 }
+
+/** Nepřetržité štěrchání během „Podrž a zatřes“. Vrací funkci pro zastavení. */
+export function startRattle(): () => void {
+  if (!enabled) return () => {};
+  const ac = getCtx();
+  if (!ac) return () => {};
+  let stopped = false;
+  const tick = () => {
+    if (stopped || !enabled) return;
+    const now = ac.currentTime + 0.005;
+    const n = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++) {
+      click(ac, now + i * 0.018 + Math.random() * 0.01, 1600 + Math.random() * 3000, 0.1 + Math.random() * 0.12, 0.035);
+    }
+    // dutý úder o stěnu kelímku
+    if (Math.random() > 0.6) tone(ac, now, 120 + Math.random() * 60, 0.06, 0.08, 'triangle', 80);
+  };
+  tick();
+  const timer = setInterval(tick, 70);
+  return () => {
+    stopped = true;
+    clearInterval(timer);
+  };
+}
+
+/** 4-Kostkový Charlie – rychlé arpeggio nahoru. */
+export function playCharlie(): void {
+  play((ac, now) => {
+    [392, 523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+      tone(ac, now + i * 0.06, f, 0.3, 0.13, 'triangle');
+      tone(ac, now + i * 0.06 + 0.03, f * 1.5, 0.2, 0.05, 'sine');
+    });
+    tone(ac, now + 0.35, 1568, 0.5, 0.1, 'square');
+  });
+}
+
+/** Výhra vedlejší sázky „Pár“. */
+export function playPairWin(): void {
+  play((ac, now) => {
+    for (let i = 0; i < 5; i++) {
+      tone(ac, now + i * 0.06, 2200 + i * 180, 0.12, 0.09, 'sine');
+      click(ac, now + i * 0.06, 5000, 0.1, 0.03);
+    }
+  });
+}
+
+/** Kovový cink cinknuté kostky d3. */
+export function playMetalDie(): void {
+  play((ac, now) => {
+    tone(ac, now, 1320, 0.6, 0.1, 'sine');
+    tone(ac, now, 1980 * 1.01, 0.45, 0.06, 'sine');
+    tone(ac, now, 3170, 0.3, 0.04, 'sine');
+  });
+}
+
+/** Rozhoření plamene Hot Streak. */
+export function playHotStreak(): void {
+  play((ac, now) => {
+    if (!master) return;
+    const src = ac.createBufferSource();
+    src.buffer = noiseBuffer(ac, 0.7);
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(300, now);
+    lp.frequency.exponentialRampToValueAtTime(3000, now + 0.5);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.35, now + 0.25);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
+    src.connect(lp).connect(g).connect(master);
+    src.start(now);
+    src.stop(now + 0.75);
+    tone(ac, now + 0.2, 660, 0.4, 0.08, 'triangle', 990);
+  });
+}
