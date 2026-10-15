@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { BookOpen, Coins, Flame, Trophy, Volume2, VolumeX, Wallet } from 'lucide-react';
+import { BookOpen, Coins, Flame, GraduationCap, Trophy, Volume2, VolumeX, Wallet } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { AnimatedNumber, formatMoney } from './AnimatedNumber';
 
@@ -13,13 +13,27 @@ interface Props {
   soundOn: boolean;
   onToggleSound: () => void;
   onOpenRules: () => void;
+  onOpenTrainer: () => void;
+  trainerOn: boolean;
 }
 
-export function Header({ bankroll, stake, streak, hot, highScore, rounds, soundOn, onToggleSound, onOpenRules }: Props) {
+export function Header({
+  bankroll,
+  stake,
+  streak,
+  hot,
+  highScore,
+  rounds,
+  soundOn,
+  onToggleSound,
+  onOpenRules,
+  onOpenTrainer,
+  trainerOn,
+}: Props) {
   return (
-    <header className="px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-1.5">
-      <div className="flex items-center gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+    <header className="px-3 pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-1.5">
+      <div className="flex items-center gap-1.5">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <div className="relative min-w-0 flex-1">
             <AnimatePresence>{hot && <FlameAura key="flame" />}</AnimatePresence>
             <Stat
@@ -39,6 +53,9 @@ export function Header({ bankroll, stake, streak, hot, highScore, rounds, soundO
         </div>
         <IconButton label={soundOn ? 'Vypnout zvuk' : 'Zapnout zvuk'} onClick={onToggleSound}>
           {soundOn ? <Volume2 className="size-5" /> : <VolumeX className="size-5 text-slate-400" />}
+        </IconButton>
+        <IconButton label="Trenažér strategie" onClick={onOpenTrainer}>
+          <GraduationCap className={`size-5 ${trainerOn ? 'text-emerald-400' : ''}`} />
         </IconButton>
         <IconButton label="Pravidla hry" onClick={onOpenRules}>
           <BookOpen className="size-5" />
@@ -135,7 +152,7 @@ function IconButton({ label, onClick, children }: { label: string; onClick: () =
       aria-label={label}
       title={label}
       onClick={onClick}
-      className="grid size-11 shrink-0 place-items-center rounded-xl bg-black/30 text-slate-100 ring-1 ring-white/10 transition active:scale-95 active:bg-black/50"
+      className="grid size-10 shrink-0 place-items-center rounded-xl bg-black/30 text-slate-100 ring-1 ring-white/10 transition active:scale-95 active:bg-black/50"
     >
       {children}
     </button>

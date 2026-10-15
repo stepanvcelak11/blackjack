@@ -3,15 +3,34 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { formatMoney } from './components/AnimatedNumber';
 import { ChipStack } from './components/Chip';
-import { Controls, type HoldHandlers } from './components/Controls';
+import { Controls, type GameActions, type HoldHandlers } from './components/Controls';
 import { DealerZone } from './components/DealerZone';
 import { DieFace } from './components/Die';
 import { HandView } from './components/HandView';
 import { Header } from './components/Header';
 import { RulesModal } from './components/RulesModal';
+import { WizPanel } from './components/WizPanel';
 import { useDiceJack, type BetTarget, type Flash, type GameState } from './hooks/useDiceJack';
 import { hapticTap } from './lib/haptics';
 import { setSoundEnabled, startRattle, unlockAudio } from './lib/soundEffects';
+import { advise, MOVE_LABEL, type Advice, type Move } from './lib/strategy';
+import {
+  EMPTY_STATS,
+  loadSettings,
+  loadStats,
+  saveSettings,
+  saveStats,
+  type TrainerSettings,
+  type TrainerStats,
+} from './lib/trainerStore';
+
+interface CoachNote {
+  id: number;
+  ok: boolean;
+  chosen: Move;
+  best: Move;
+  loss: number;
+}
 
 const SOUND_KEY = 'dicejack12:sound';
 
@@ -46,6 +65,11 @@ export default function App() {
   const [soundOn, setSoundOn] = useState(readSoundPref);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [shaking, setShaking] = useState(false);
+  const [wizOpen, setWizOpen] = useState(false);
+  const [trainer, setTrainer] = useState<TrainerSettings>(loadSettings);
+  const [tstats, setTstats] = useState<TrainerStats>(loadStats);
+  const [note, setNote] = useState<CoachNote | null>(null);
+  const noteId = useRef(0);
   const stopRattle = useRef<(() => void) | null>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const dieSize = useDieSize(frameRef);
@@ -100,6 +124,53 @@ export default function App() {
     setTimeout(() => void confetti({ particleCount: 80, angle: 120, spread: 60, origin: { x: 1, y: 0.7 }, colors }), 400);
   }, [state.phase, state.round, state.hands]);
 
+  useEffect(() => saveSettings(trainer), [trainer]);
+  useEffect(() => saveStats(tstats), [tstats]);
+
+  // ---------- Trenér: optimální tah pro aktuální situaci ----------
+  const activeHand = state.phase === 'player' && !state.busy ? state.hands[state.activeHand] : undefined;
+  const advice: Advice | null = useMemo(() => {
+    if (!activeHand || activeHand.status !== 'playing' || !state.dealer[0]) return null;
+    return advise({
+      dice: activeHand.dice.map((d) => d.value),
+      up: state.dealer[0].value,
+      canDouble: game.canDouble,
+      canSplit: game.canSplit,
+      canSafe: game.canSafeHit,
+    });
+  }, [activeHand, state.dealer, game.canDouble, game.canSplit, game.canSafeHit]);
+
+  const judge = useCallback(
+    (chosen: Move) => {
+      if (!advice || !trainer.coach) return;
+      const evs = advice.evs;
+      const loss = Math.max(0, (evs[advice.best] ?? 0) - (evs[chosen] ?? 0));
+      const ok = chosen === advice.best || loss < 1e-6;
+      setTstats((s) => ({
+        ...s,
+        gameDecisions: s.gameDecisions + 1,
+        gameCorrect: s.gameCorrect + (ok ? 1 : 0),
+        gameEvLost: s.gameEvLost + loss,
+      }));
+      const id = ++noteId.current;
+      setNote({ id, ok, chosen, best: advice.best, loss });
+      setTimeout(() => setNote((n) => (n?.id === id ? null : n)), ok ? 1400 : 3200);
+    },
+    [advice, trainer.coach],
+  );
+
+  const { actions } = game;
+  const play = useMemo<GameActions>(
+    () => ({
+      hit: () => (judge('H'), void actions.hit()),
+      stand: () => (judge('S'), void actions.stand()),
+      doubleDown: () => (judge('D'), void actions.doubleDown()),
+      split: () => (judge('P'), void actions.split()),
+      safeHit: () => (judge('B'), void actions.safeHit()),
+    }),
+    [judge, actions],
+  );
+
   const toggleSound = useCallback(() => setSoundOn((v) => !v), []);
   const stake = state.phase === 'betting' ? state.bet + state.sideBet : game.totalStake;
   const isSplit = state.hands.length > 1;
@@ -119,6 +190,8 @@ export default function App() {
           soundOn={soundOn}
           onToggleSound={toggleSound}
           onOpenRules={() => setRulesOpen(true)}
+          onOpenTrainer={() => setWizOpen(true)}
+          trainerOn={trainer.coach || trainer.hints}
         />
 
         <main className="relative flex min-h-0 flex-1 flex-col justify-between px-3 pb-1">
@@ -130,6 +203,7 @@ export default function App() {
           {/* Střed stolu: logo / zprávy / výsledek / třesení */}
           <div className="relative flex min-h-[4.5rem] flex-1 items-center justify-center">
             <TableLogo faded={showTable || shaking} />
+            <AnimatePresence>{note && <CoachToast key={note.id} note={note} />}</AnimatePresence>
             <AnimatePresence mode="wait">
               {shaking ? (
                 <ShakerCup key="shaker" dice={shakeCount} size={Math.round(dieSize * 0.7)} />
@@ -186,10 +260,19 @@ export default function App() {
         </main>
 
         <footer className="rounded-t-3xl border-t border-white/10 bg-gradient-to-b from-slate-950/70 to-slate-950/95 px-3 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-10px_30px_rgba(0,0,0,.35)]">
-          <Controls game={game} hold={hold} />
+          <Controls game={game} hold={hold} play={play} recommended={trainer.hints ? advice?.best : null} />
         </footer>
 
         <RulesModal open={rulesOpen} onClose={() => setRulesOpen(false)} />
+        <WizPanel
+          open={wizOpen}
+          onClose={() => setWizOpen(false)}
+          settings={trainer}
+          onSettings={setTrainer}
+          stats={tstats}
+          onStats={setTstats}
+          onResetStats={() => setTstats(EMPTY_STATS)}
+        />
       </div>
     </div>
   );
@@ -398,6 +481,28 @@ function ResultBanner({ state }: { state: GameState }) {
       )}
       {state.fees > 0 && (
         <div className="text-[10px] font-semibold opacity-75">vč. cinknuté kostky −{formatMoney(state.fees)}</div>
+      )}
+    </motion.div>
+  );
+}
+
+/** Krátké hodnocení tahu od trenéra. */
+function CoachToast({ note }: { note: CoachNote }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -10, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -6 }}
+      className={`absolute top-4 z-20 max-w-[92%] rounded-xl px-3 py-1.5 text-center text-xs font-bold shadow-lg ring-1 ${note.ok ? 'bg-emerald-950/95 text-emerald-200 ring-emerald-400/50' : 'bg-rose-950/95 text-rose-100 ring-rose-400/60'}`}
+      role="status"
+    >
+      {note.ok ? (
+        <>✓ Správně – {MOVE_LABEL[note.chosen]}</>
+      ) : (
+        <>
+          ✗ Lepší bylo: <span className="text-white">{MOVE_LABEL[note.best]}</span>
+          <span className="ml-1 font-semibold text-rose-300">(−{(note.loss * 100).toFixed(1)} % sázky)</span>
+        </>
       )}
     </motion.div>
   );

@@ -4,6 +4,7 @@ import { useRef, type ReactNode } from 'react';
 import type { DiceJackGame } from '../hooks/useDiceJack';
 import { CHIP_VALUES, STARTING_BANKROLL } from '../lib/gameRules';
 import { playButton } from '../lib/soundEffects';
+import type { Move } from '../lib/strategy';
 import { formatMoney } from './AnimatedNumber';
 import { ChipButton } from './Chip';
 
@@ -22,6 +23,8 @@ interface ActionProps {
   variant: 'hit' | 'stand' | 'double' | 'split' | 'primary' | 'ghost' | 'safe';
   className?: string;
   hold?: HoldHandlers;
+  /** Nápověda trenéra: tohle je doporučený tah. */
+  recommended?: boolean;
 }
 
 const VARIANTS: Record<ActionProps['variant'], string> = {
@@ -34,7 +37,7 @@ const VARIANTS: Record<ActionProps['variant'], string> = {
   safe: 'from-yellow-200 via-amber-400 to-yellow-700 text-amber-950 shadow-yellow-900/70 ring-2 ring-yellow-200/80',
 };
 
-function ActionButton({ label, hint, icon, disabled, onClick, variant, className = '', hold }: ActionProps) {
+function ActionButton({ label, hint, icon, disabled, onClick, variant, className = '', hold, recommended = false }: ActionProps) {
   const holding = useRef(false);
 
   const fire = () => {
@@ -67,8 +70,13 @@ function ActionButton({ label, hint, icon, disabled, onClick, variant, className
         fire();
       }}
       whileTap={disabled ? undefined : { scale: 0.94, y: 2 }}
-      className={`no-callout flex h-14 touch-none items-center justify-center gap-2 rounded-2xl bg-gradient-to-b px-3 text-base font-black tracking-wide uppercase shadow-[0_4px_0_0] ring-1 ring-white/20 transition-[opacity,filter] disabled:cursor-not-allowed disabled:opacity-25 disabled:shadow-none disabled:saturate-0 ${VARIANTS[variant]} ${className}`}
+      className={`no-callout relative flex h-14 touch-none items-center justify-center gap-2 rounded-2xl bg-gradient-to-b px-3 text-base font-black tracking-wide uppercase shadow-[0_4px_0_0] ring-1 ring-white/20 transition-[opacity,filter] disabled:cursor-not-allowed disabled:opacity-25 disabled:shadow-none disabled:saturate-0 ${VARIANTS[variant]} ${recommended ? 'recommended' : ''} ${className}`}
     >
+      {recommended && (
+        <span className="absolute -top-2 right-2 rounded-full bg-white px-1.5 text-[9px] leading-4 font-black tracking-wider text-emerald-700 shadow">
+          DOPORUČENO
+        </span>
+      )}
       {icon}
       <span className="flex flex-col items-start leading-none">
         {label}
@@ -78,7 +86,26 @@ function ActionButton({ label, hint, icon, disabled, onClick, variant, className
   );
 }
 
-export function Controls({ game, hold }: { game: DiceJackGame; hold: HoldHandlers }) {
+export interface GameActions {
+  hit: () => void;
+  stand: () => void;
+  doubleDown: () => void;
+  split: () => void;
+  safeHit: () => void;
+}
+
+export function Controls({
+  game,
+  hold,
+  play,
+  recommended,
+}: {
+  game: DiceJackGame;
+  hold: HoldHandlers;
+  /** Tahy hráče (obalené trenérem). */
+  play: GameActions;
+  recommended?: Move | null;
+}) {
   const { state, actions } = game;
 
   if (state.phase === 'betting') {
@@ -193,7 +220,7 @@ export function Controls({ game, hold }: { game: DiceJackGame; hold: HoldHandler
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
+            className="-mx-1 -mt-2 overflow-hidden px-1 pt-2 pb-1"
           >
             <ActionButton
               label="Bezpečný příhoz (d3)"
@@ -204,7 +231,8 @@ export function Controls({ game, hold }: { game: DiceJackGame; hold: HoldHandler
               }
               icon={<Crosshair className="size-6" />}
               disabled={!game.canSafeHit}
-              onClick={actions.safeHit}
+              onClick={play.safeHit}
+              recommended={recommended === 'B'}
               variant="safe"
               className="h-12 w-full"
             />
@@ -217,7 +245,8 @@ export function Controls({ game, hold }: { game: DiceJackGame; hold: HoldHandler
           hint="klepni / podrž"
           icon={<Plus className="size-6" strokeWidth={3} />}
           disabled={!game.canHit}
-          onClick={actions.hit}
+          onClick={play.hit}
+          recommended={recommended === 'H'}
           variant="hit"
           hold={hold}
         />
@@ -226,7 +255,8 @@ export function Controls({ game, hold }: { game: DiceJackGame; hold: HoldHandler
           hint="ukončit tah"
           icon={<HandIcon className="size-6" />}
           disabled={!game.canStand}
-          onClick={actions.stand}
+          onClick={play.stand}
+          recommended={recommended === 'S'}
           variant="stand"
         />
         <ActionButton
@@ -234,7 +264,8 @@ export function Controls({ game, hold }: { game: DiceJackGame; hold: HoldHandler
           hint="2× sázka, 1 kostka"
           icon={<ChevronsUp className="size-6" strokeWidth={3} />}
           disabled={!game.canDouble}
-          onClick={actions.doubleDown}
+          onClick={play.doubleDown}
+          recommended={recommended === 'D'}
           variant="double"
         />
         <ActionButton
@@ -242,7 +273,8 @@ export function Controls({ game, hold }: { game: DiceJackGame; hold: HoldHandler
           hint="split páru"
           icon={<Split className="size-6" />}
           disabled={!game.canSplit}
-          onClick={actions.split}
+          onClick={play.split}
+          recommended={recommended === 'P'}
           variant="split"
         />
       </div>

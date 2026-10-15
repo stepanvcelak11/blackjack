@@ -148,6 +148,10 @@ export function RulesModal({ open, onClose }: Props) {
                 Při <b>3 vyhraných kolech v řadě</b> se rozhoří plamen kolem bankrollu. Každá další výhra v sérii
                 dostane od kasina bonus <b>+20 %</b> z čisté výhry. Remíza sérii nepřeruší, prohra ano.
               </Section>
+              <Section title="Trenažér (DiceJack Wiz)">
+                Ikona čepice v záhlaví otevře trenažér: dril rozhodování, přesné strategické tabulky, odhad rizika a
+                trenéra, který ve hře hodnotí každý váš tah (a volitelně zvýrazní doporučený).
+              </Section>
               <Section title="Ovládání">
                 <b>Hodit kostky</b> a <b>Přihodit</b> stačí klepnout – nebo tlačítko <b>podržte</b>, kostky se v
                 kelímku roztřesou a padnou, až prst pustíte.
