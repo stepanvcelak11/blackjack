@@ -25,7 +25,7 @@ export function BottomNav({
   return (
     <nav
       aria-label="Sekce"
-      className="relative z-30 grid shrink-0 grid-cols-5 border-t border-white/10 bg-slate-950 pb-[env(safe-area-inset-bottom)]"
+      className="relative z-30 grid shrink-0 grid-cols-5 border-t border-white/10 bg-slate-950 pb-[var(--nav-safe)]"
     >
       {ITEMS.map((it) => {
         const on = it.id === active;

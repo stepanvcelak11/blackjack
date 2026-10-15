@@ -1,5 +1,5 @@
 // Jednoduchý service worker: network-first s fallbackem do cache (offline hraní).
-const CACHE = 'dicejack12-v1';
+const CACHE = 'dicejack12-v2';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './index.html', './icon.svg', './manifest.webmanifest'])));

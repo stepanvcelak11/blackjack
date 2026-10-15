@@ -2,6 +2,8 @@
 
 :root {
   color-scheme: dark;
+  /* spodní odsazení lišty (nad „home indikátorem“) */
+  --nav-safe: env(safe-area-inset-bottom, 0px);
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
@@ -105,3 +107,12 @@ button {
   50% { box-shadow: 0 0 0 4px rgba(255, 255, 255, 1), 0 0 22px 6px rgba(52, 211, 153, 0.85); }
 }
 .recommended { animation: recommend-pulse 1.1s ease-in-out infinite; }
+
+/* iPhone – aplikace na ploše s chybně nahlášenou výškou (viz lib/viewportFix.ts). */
+html.ios-pwa-fix .app-shell {
+  bottom: auto;
+  height: var(--app-h);
+}
+html.ios-pwa-fix {
+  --nav-safe: max(env(safe-area-inset-bottom, 0px), 22px);
+}
