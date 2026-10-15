@@ -8,8 +8,11 @@ import { DealerZone } from './components/DealerZone';
 import { DieFace } from './components/Die';
 import { HandView } from './components/HandView';
 import { Header } from './components/Header';
-import { RulesModal } from './components/RulesModal';
-import { WizPanel } from './components/WizPanel';
+import { BottomNav, type Screen } from './components/BottomNav';
+import { ProfileScreen } from './components/screens/ProfileScreen';
+import { RulesScreen } from './components/screens/RulesScreen';
+import { StrategyScreen } from './components/screens/StrategyScreen';
+import { TrainingScreen } from './components/screens/TrainingScreen';
 import { useDiceJack, type BetTarget, type Flash, type GameState } from './hooks/useDiceJack';
 import { hapticTap } from './lib/haptics';
 import { setSoundEnabled, startRattle, unlockAudio } from './lib/soundEffects';
@@ -33,6 +36,17 @@ interface CoachNote {
 }
 
 const SOUND_KEY = 'dicejack12:sound';
+const SCREEN_KEY = 'dicejack12:screen';
+const SCREENS: Screen[] = ['game', 'strategy', 'training', 'profile', 'rules'];
+
+function readScreen(): Screen {
+  try {
+    const v = localStorage.getItem(SCREEN_KEY) as Screen | null;
+    return v && SCREENS.includes(v) ? v : 'game';
+  } catch {
+    return 'game';
+  }
+}
 
 function readSoundPref(): boolean {
   try {
@@ -63,9 +77,8 @@ export default function App() {
   const game = useDiceJack();
   const { state } = game;
   const [soundOn, setSoundOn] = useState(readSoundPref);
-  const [rulesOpen, setRulesOpen] = useState(false);
+  const [screen, setScreen] = useState<Screen>(readScreen);
   const [shaking, setShaking] = useState(false);
-  const [wizOpen, setWizOpen] = useState(false);
   const [trainer, setTrainer] = useState<TrainerSettings>(loadSettings);
   const [tstats, setTstats] = useState<TrainerStats>(loadStats);
   const [note, setNote] = useState<CoachNote | null>(null);
@@ -120,9 +133,23 @@ export default function App() {
     if (!dj && !charlie) return;
     const colors = dj ? ['#fcd34d', '#f59e0b', '#ffffff', '#10b981'] : ['#e879f9', '#a855f7', '#fcd34d', '#ffffff'];
     void confetti({ particleCount: 140, spread: 80, origin: { y: 0.65 }, colors, disableForReducedMotion: true });
-    setTimeout(() => void confetti({ particleCount: 80, angle: 60, spread: 60, origin: { x: 0, y: 0.7 }, colors }), 250);
-    setTimeout(() => void confetti({ particleCount: 80, angle: 120, spread: 60, origin: { x: 1, y: 0.7 }, colors }), 400);
+    setTimeout(
+      () => void confetti({ particleCount: 80, angle: 60, spread: 60, origin: { x: 0, y: 0.7 }, colors }),
+      250,
+    );
+    setTimeout(
+      () => void confetti({ particleCount: 80, angle: 120, spread: 60, origin: { x: 1, y: 0.7 }, colors }),
+      400,
+    );
   }, [state.phase, state.round, state.hands]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SCREEN_KEY, screen);
+    } catch {
+      /* ignorovat */
+    }
+  }, [screen]);
 
   useEffect(() => saveSettings(trainer), [trainer]);
   useEffect(() => saveStats(tstats), [tstats]);
@@ -176,103 +203,126 @@ export default function App() {
   const isSplit = state.hands.length > 1;
   const showTable = state.phase !== 'betting';
   const shakeCount = state.phase === 'betting' ? 2 : 1;
+  const roundLive = state.phase !== 'betting' && state.phase !== 'settled';
+  const liveHand = state.phase === 'player' ? state.hands[state.activeHand] : undefined;
+  const current =
+    liveHand && liveHand.status === 'playing' && state.dealer[0]
+      ? { dice: liveHand.dice.map((d) => d.value), up: state.dealer[0].value }
+      : null;
 
   return (
     <div className="app-shell">
-      <div ref={frameRef} className="phone-frame felt relative flex flex-col overflow-hidden text-white">
-        <Header
-          bankroll={state.bankroll}
-          stake={stake}
-          streak={state.streak}
-          hot={game.hot}
-          highScore={state.highScore}
-          rounds={state.rounds}
-          soundOn={soundOn}
-          onToggleSound={toggleSound}
-          onOpenRules={() => setRulesOpen(true)}
-          onOpenTrainer={() => setWizOpen(true)}
-          trainerOn={trainer.coach || trainer.hints}
-        />
+      <div className="phone-frame relative flex flex-col overflow-hidden bg-slate-950 text-white">
+        <div className="relative min-h-0 flex-1">
+          {/* Hra zůstává připojená i na jiných záložkách, aby kolo běželo dál bez přehrání animací. */}
+          <div
+            ref={frameRef}
+            className={`felt flex h-full flex-col ${screen === 'game' ? '' : 'hidden'}`}
+            aria-hidden={screen !== 'game'}
+          >
+            <Header
+              bankroll={state.bankroll}
+              stake={stake}
+              streak={state.streak}
+              hot={game.hot}
+              highScore={state.highScore}
+              rounds={state.rounds}
+              soundOn={soundOn}
+              onToggleSound={toggleSound}
+              coachOn={trainer.coach || trainer.hints}
+              onOpenProfile={() => setScreen('profile')}
+            />
 
-        <main className="relative flex min-h-0 flex-1 flex-col justify-between px-3 pb-1">
-          {/* Krupiér */}
-          <div className="pt-1">
-            <DealerZone dice={state.dealer} dieSize={dieSize} thinking={state.phase === 'dealer'} />
+            <main className="relative flex min-h-0 flex-1 flex-col justify-between px-3 pb-1">
+              {/* Krupiér */}
+              <div className="pt-1">
+                <DealerZone dice={state.dealer} dieSize={dieSize} thinking={state.phase === 'dealer'} />
+              </div>
+
+              {/* Střed stolu: logo / zprávy / výsledek / třesení */}
+              <div className="relative flex min-h-[4.5rem] flex-1 items-center justify-center">
+                <TableLogo faded={showTable || shaking} />
+                <AnimatePresence>{note && <CoachToast key={note.id} note={note} />}</AnimatePresence>
+                <AnimatePresence mode="wait">
+                  {shaking ? (
+                    <ShakerCup key="shaker" dice={shakeCount} size={Math.round(dieSize * 0.7)} />
+                  ) : state.flash ? (
+                    <FlashBanner key={`flash-${state.flash.id}`} flash={state.flash} />
+                  ) : state.phase === 'settled' && state.message ? (
+                    <ResultBanner key={`res-${state.round}`} state={state} />
+                  ) : state.message ? (
+                    <motion.div
+                      key={state.message}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      className="relative rounded-full bg-black/45 px-4 py-1.5 text-sm font-bold text-amber-200 ring-1 ring-amber-300/30"
+                    >
+                      {state.message}
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
+              </div>
+
+              {/* Hráč */}
+              <section aria-label="Vaše ruce" className="flex min-h-0 flex-col items-center gap-1">
+                {state.phase === 'betting' ? (
+                  <BetSpots
+                    main={state.bet}
+                    side={state.sideBet}
+                    target={state.betTarget}
+                    onSelect={game.actions.setBetTarget}
+                  />
+                ) : (
+                  <>
+                    {state.sideStake > 0 && <SideBetChip amount={state.sideStake} result={state.sideResult} />}
+                    <div className={`flex w-full items-start justify-center ${isSplit ? 'gap-2' : ''}`}>
+                      {state.hands.map((h, i) => {
+                        const active = state.phase === 'player' && i === state.activeHand;
+                        return (
+                          <HandView
+                            key={h.id}
+                            hand={h}
+                            index={i}
+                            isSplit={isSplit}
+                            active={active}
+                            shaking={shaking && active}
+                            dieSize={dieSize}
+                          />
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+                <div className="text-xs font-bold tracking-[0.2em] text-emerald-100/70 uppercase">Vy</div>
+              </section>
+            </main>
+
+            <footer className="rounded-t-3xl border-t border-white/10 bg-gradient-to-b from-slate-950/70 to-slate-950 px-3 pt-2.5 pb-2.5 shadow-[0_-10px_30px_rgba(0,0,0,.35)]">
+              <Controls game={game} hold={hold} play={play} recommended={trainer.hints ? advice?.best : null} />
+            </footer>
           </div>
-
-          {/* Střed stolu: logo / zprávy / výsledek / třesení */}
-          <div className="relative flex min-h-[4.5rem] flex-1 items-center justify-center">
-            <TableLogo faded={showTable || shaking} />
-            <AnimatePresence>{note && <CoachToast key={note.id} note={note} />}</AnimatePresence>
-            <AnimatePresence mode="wait">
-              {shaking ? (
-                <ShakerCup key="shaker" dice={shakeCount} size={Math.round(dieSize * 0.7)} />
-              ) : state.flash ? (
-                <FlashBanner key={`flash-${state.flash.id}`} flash={state.flash} />
-              ) : state.phase === 'settled' && state.message ? (
-                <ResultBanner key={`res-${state.round}`} state={state} />
-              ) : state.message ? (
-                <motion.div
-                  key={state.message}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  className="relative rounded-full bg-black/45 px-4 py-1.5 text-sm font-bold text-amber-200 ring-1 ring-amber-300/30"
-                >
-                  {state.message}
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-          </div>
-
-          {/* Hráč */}
-          <section aria-label="Vaše ruce" className="flex min-h-0 flex-col items-center gap-1">
-            {state.phase === 'betting' ? (
-              <BetSpots
-                main={state.bet}
-                side={state.sideBet}
-                target={state.betTarget}
-                onSelect={game.actions.setBetTarget}
-              />
-            ) : (
-              <>
-                {state.sideStake > 0 && <SideBetChip amount={state.sideStake} result={state.sideResult} />}
-                <div className={`flex w-full items-start justify-center ${isSplit ? 'gap-2' : ''}`}>
-                  {state.hands.map((h, i) => {
-                    const active = state.phase === 'player' && i === state.activeHand;
-                    return (
-                      <HandView
-                        key={h.id}
-                        hand={h}
-                        index={i}
-                        isSplit={isSplit}
-                        active={active}
-                        shaking={shaking && active}
-                        dieSize={dieSize}
-                      />
-                    );
-                  })}
-                </div>
-              </>
-            )}
-            <div className="text-xs font-bold tracking-[0.2em] text-emerald-100/70 uppercase">Vy</div>
-          </section>
-        </main>
-
-        <footer className="rounded-t-3xl border-t border-white/10 bg-gradient-to-b from-slate-950/70 to-slate-950/95 px-3 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-10px_30px_rgba(0,0,0,.35)]">
-          <Controls game={game} hold={hold} play={play} recommended={trainer.hints ? advice?.best : null} />
-        </footer>
-
-        <RulesModal open={rulesOpen} onClose={() => setRulesOpen(false)} />
-        <WizPanel
-          open={wizOpen}
-          onClose={() => setWizOpen(false)}
-          settings={trainer}
-          onSettings={setTrainer}
-          stats={tstats}
-          onStats={setTstats}
-          onResetStats={() => setTstats(EMPTY_STATS)}
-        />
+          {screen === 'strategy' && <StrategyScreen current={current} />}
+          {screen === 'training' && <TrainingScreen stats={tstats} onStats={setTstats} />}
+          {screen === 'profile' && (
+            <ProfileScreen
+              game={state}
+              stats={tstats}
+              settings={trainer}
+              onSettings={setTrainer}
+              soundOn={soundOn}
+              onSound={setSoundOn}
+              onResetStats={() => setTstats(EMPTY_STATS)}
+              canResetBankroll={!state.busy && (state.phase === 'betting' || state.phase === 'settled')}
+              onResetBankroll={() => {
+                game.actions.takeLoan();
+                setScreen('game');
+              }}
+            />
+          )}
+          {screen === 'rules' && <RulesScreen />}
+        </div>
+        <BottomNav active={screen} onChange={setScreen} roundLive={roundLive} />
       </div>
     </div>
   );

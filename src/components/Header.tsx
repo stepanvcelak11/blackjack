@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { BookOpen, Coins, Flame, GraduationCap, Trophy, Volume2, VolumeX, Wallet } from 'lucide-react';
+import { Coins, Flame, GraduationCap, Trophy, Volume2, VolumeX, Wallet } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { AnimatedNumber, formatMoney } from './AnimatedNumber';
 
@@ -12,9 +12,9 @@ interface Props {
   rounds: number;
   soundOn: boolean;
   onToggleSound: () => void;
-  onOpenRules: () => void;
-  onOpenTrainer: () => void;
-  trainerOn: boolean;
+  /** Trenér nebo nápověda je zapnutá – ukázat odznak (klepnutím do Profilu). */
+  coachOn: boolean;
+  onOpenProfile: () => void;
 }
 
 export function Header({
@@ -26,9 +26,8 @@ export function Header({
   rounds,
   soundOn,
   onToggleSound,
-  onOpenRules,
-  onOpenTrainer,
-  trainerOn,
+  coachOn,
+  onOpenProfile,
 }: Props) {
   return (
     <header className="px-3 pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-1.5">
@@ -54,12 +53,11 @@ export function Header({
         <IconButton label={soundOn ? 'Vypnout zvuk' : 'Zapnout zvuk'} onClick={onToggleSound}>
           {soundOn ? <Volume2 className="size-5" /> : <VolumeX className="size-5 text-slate-400" />}
         </IconButton>
-        <IconButton label="Trenažér strategie" onClick={onOpenTrainer}>
-          <GraduationCap className={`size-5 ${trainerOn ? 'text-emerald-400' : ''}`} />
-        </IconButton>
-        <IconButton label="Pravidla hry" onClick={onOpenRules}>
-          <BookOpen className="size-5" />
-        </IconButton>
+        {coachOn && (
+          <IconButton label="Trenér je zapnutý – nastavení" onClick={onOpenProfile}>
+            <GraduationCap className="size-5 text-emerald-400" />
+          </IconButton>
+        )}
       </div>
       <div className="mt-1 flex items-center justify-between px-1 text-[10px] font-bold tracking-wider text-emerald-100/60 uppercase">
         <span className="flex items-center gap-1">

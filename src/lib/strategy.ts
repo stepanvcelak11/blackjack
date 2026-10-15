@@ -222,6 +222,8 @@ function cellFor(dice: number[], up: number, allowSplit: boolean): ChartCell {
 export interface ChartRow {
   label: string;
   sub?: string;
+  /** Reprezentativní kostky řádku (pro detail buňky). */
+  dice: number[];
   cells: ChartCell[];
 }
 
@@ -243,17 +245,20 @@ export function chart(kind: ChartKind): ChartRow[] {
     rows = Object.entries(rep).map(([t, dice]) => ({
       label: t,
       sub: t === '4' ? '2+2' : undefined,
+      dice,
       cells: UPCARDS.map((u) => cellFor(dice, u, false)),
     }));
   } else if (kind === 'soft') {
     rows = [2, 3, 4, 5, 6].map((x) => ({
       label: `1+${x}`,
       sub: `${1 + x} / ${4 + x}`,
+      dice: [1, x],
       cells: UPCARDS.map((u) => cellFor([1, x], u, false)),
     }));
   } else if (kind === 'pairs') {
     rows = [1, 2, 3, 4, 5].map((v) => ({
       label: `${v}-${v}`,
+      dice: [v, v],
       cells: UPCARDS.map((u) => cellFor([v, v], u, true)),
     }));
   } else {
@@ -263,6 +268,7 @@ export function chart(kind: ChartKind): ChartRow[] {
     };
     rows = Object.entries(rep).map(([t, dice]) => ({
       label: t,
+      dice,
       cells: UPCARDS.map((u) => cellFor(dice, u, false)),
     }));
   }
@@ -272,3 +278,16 @@ export function chart(kind: ChartKind): ChartRow[] {
 
 /** Pravděpodobnost tropy dalším hodem d6 podle tvrdého součtu (v %). */
 export const bustPercent = (hard: number) => Math.round((Math.max(0, 6 - Math.max(0, TARGET - hard)) / 6) * 100);
+
+/** Do kterého řádku tabulky patří daná ruka (pro zvýraznění aktuální situace). */
+export function chartPosition(dice: number[]): { kind: ChartKind; label: string } | null {
+  const hard = dice.reduce((a, b) => a + b, 0);
+  const ones = dice.filter((v) => v === 1).length;
+  if (dice.length === 2) {
+    if (dice[0] === dice[1] && dice[0] < 6) return { kind: 'pairs', label: `${dice[0]}-${dice[0]}` };
+    if (ones === 1) return { kind: 'soft', label: `1+${hard - 1}` };
+    if (ones === 0 && hard >= 4 && hard <= 11) return { kind: 'hard', label: String(hard) };
+  }
+  if (dice.length === 3 && ones === 0 && hard >= 6 && hard <= 11) return { kind: 'three', label: String(hard) };
+  return null;
+}
