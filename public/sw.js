@@ -2,7 +2,7 @@
 const CACHE = 'dicejack12-v1';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/', '/index.html', '/icon.svg', '/manifest.webmanifest'])));
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './index.html', './icon.svg', './manifest.webmanifest'])));
   self.skipWaiting();
 });
 
@@ -23,6 +23,6 @@ self.addEventListener('fetch', (event) => {
         caches.open(CACHE).then((c) => c.put(request, copy));
         return res;
       })
-      .catch(() => caches.match(request).then((r) => r || caches.match('/index.html'))),
+      .catch(() => caches.match(request).then((r) => r || caches.match('./index.html'))),
   );
 });
